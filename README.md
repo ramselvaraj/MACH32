@@ -1,2 +1,5 @@
 # MACH32
-A collection of STM32 Baremetal Drivers I have written.
+
+![MACH32](assets/mach32.jpeg)
+
+A collection of baremetal drivers for the STM32.

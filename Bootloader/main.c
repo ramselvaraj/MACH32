@@ -8,6 +8,23 @@
 #define MACH32_RAM_START    0x20000000UL
 #define MACH32_RAM_END      0x20020000UL
 #define MACH32_BOOT_WAIT_MS 10000UL
+#define MACH32_RX_TIMEOUT_MS 2000UL
+
+typedef struct {
+    uint32_t start;
+    uint32_t end;
+    uint8_t first_sector;
+    uint8_t last_sector;
+    char name;
+} mach32_slot_t;
+
+static const mach32_slot_t slot_a = {
+    MACH32_SLOT_A_START, MACH32_SLOT_A_END, 4U, 5U, 'A'
+};
+
+static const mach32_slot_t slot_b = {
+    MACH32_SLOT_B_START, MACH32_SLOT_B_END, 6U, 7U, 'B'
+};
 
 static void write_text(const char *text)
 {
@@ -32,6 +49,95 @@ static uint8_t text_equals(const char *left, const char *right)
     }
 
     return (*left == '\0') && (*right == '\0');
+}
+
+static const mach32_slot_t *find_slot(char name)
+{
+    if (name == 'A') {
+        return &slot_a;
+    }
+
+    if (name == 'B') {
+        return &slot_b;
+    }
+
+    return 0;
+}
+
+static uint8_t parse_decimal(const char **text, uint32_t *value)
+{
+    uint32_t result = 0U;
+    uint8_t digit_count = 0U;
+
+    while ((**text >= '0') && (**text <= '9')) {
+        uint32_t digit = (uint32_t)(**text - '0');
+
+        if (result > ((0xFFFFFFFFUL - digit) / 10U)) {
+            return 0U;
+        }
+
+        result = (result * 10U) + digit;
+        ++(*text);
+        ++digit_count;
+    }
+
+    *value = result;
+    return digit_count != 0U;
+}
+
+static uint8_t parse_hex32(const char *text, uint32_t *value)
+{
+    uint32_t result = 0U;
+
+    for (uint8_t index = 0U; index < 8U; ++index) {
+        uint8_t digit;
+        char byte = text[index];
+
+        if ((byte >= '0') && (byte <= '9')) {
+            digit = (uint8_t)(byte - '0');
+        } else if ((byte >= 'A') && (byte <= 'F')) {
+            digit = (uint8_t)(byte - 'A' + 10);
+        } else if ((byte >= 'a') && (byte <= 'f')) {
+            digit = (uint8_t)(byte - 'a' + 10);
+        } else {
+            return 0U;
+        }
+
+        result = (result << 4U) | digit;
+    }
+
+    if (text[8] != '\0') {
+        return 0U;
+    }
+
+    *value = result;
+    return 1U;
+}
+
+static uint8_t parse_upload_command(const char *command,
+                                    const mach32_slot_t **slot,
+                                    uint32_t *size,
+                                    uint32_t *crc)
+{
+    const char *text = command;
+    const char prefix[] = "upload ";
+
+    for (size_t index = 0U; index < (sizeof(prefix) - 1U); ++index) {
+        if (text[index] != prefix[index]) {
+            return 0U;
+        }
+    }
+
+    text += sizeof(prefix) - 1U;
+    *slot = find_slot(*text++);
+
+    if ((*slot == 0) || (*text++ != ' ')
+        || (parse_decimal(&text, size) == 0U) || (*text++ != ' ')
+        || (parse_hex32(text, crc) == 0U)) {
+        return 0U;
+    }
+
+    return 1U;
 }
 
 static void usart2_init(void)
@@ -95,6 +201,128 @@ static void show_status(void)
                    ? "valid\r\n" : "empty or invalid\r\n");
 }
 
+static uint8_t read_byte_with_timeout(uint8_t *data)
+{
+    uint32_t start = mach32_systick_millis();
+
+    while ((USART2->SR & USART_SR_RXNE) == 0U) {
+        if ((uint32_t)(mach32_systick_millis() - start)
+            >= MACH32_RX_TIMEOUT_MS) {
+            return 0U;
+        }
+
+        __NOP();
+    }
+
+    *data = (uint8_t)(USART2->DR & 0xFFU);
+    return 1U;
+}
+
+static uint8_t erase_slot(const mach32_slot_t *slot)
+{
+    for (uint8_t sector = slot->first_sector;
+         sector <= slot->last_sector;
+         ++sector) {
+        if (mach32_flash_erase_sector(sector) != MACH32_FLASH_OK) {
+            return 0U;
+        }
+    }
+
+    return 1U;
+}
+
+static uint8_t receive_image(const mach32_slot_t *slot, uint32_t size)
+{
+    uint32_t word = 0xFFFFFFFFUL;
+    uint32_t vector_words[2] = {0xFFFFFFFFUL, 0xFFFFFFFFUL};
+
+    for (uint32_t offset = 0U; offset < size; ++offset) {
+        uint8_t byte;
+        uint32_t shift = (offset & 3U) * 8U;
+
+        if (read_byte_with_timeout(&byte) == 0U) {
+            return 0U;
+        }
+
+        word &= ~(0xFFUL << shift);
+        word |= (uint32_t)byte << shift;
+
+        if (((offset & 3U) == 3U) || (offset == (size - 1U))) {
+            uint32_t address = slot->start + (offset & ~3UL);
+
+            if (address < (slot->start + 8U)) {
+                vector_words[(address - slot->start) / 4U] = word;
+            } else if (mach32_flash_program_word(address, word)
+                       != MACH32_FLASH_OK) {
+                return 0U;
+            }
+
+            word = 0xFFFFFFFFUL;
+        }
+    }
+
+    /* Program the vector table last. An interrupted upload then remains
+     * invalid because its initial stack word is still erased. */
+    if (mach32_flash_program_word(slot->start + 4U, vector_words[1])
+        != MACH32_FLASH_OK) {
+        return 0U;
+    }
+
+    return mach32_flash_program_word(slot->start, vector_words[0])
+        == MACH32_FLASH_OK;
+}
+
+static void invalidate_slot(const mach32_slot_t *slot)
+{
+    (void)mach32_flash_program_word(slot->start, 0U);
+    mach32_flash_lock();
+}
+
+static void upload_image(const mach32_slot_t *slot,
+                         uint32_t size,
+                         uint32_t expected_crc)
+{
+    uint32_t capacity = slot->end - slot->start;
+
+    if ((size < 8U) || (size > capacity)) {
+        write_text("ERROR size\r\n> ");
+        return;
+    }
+
+    write_text((slot->name == 'A') ? "Erasing slot A...\r\n"
+                                   : "Erasing slot B...\r\n");
+
+    if (erase_slot(slot) == 0U) {
+        mach32_flash_lock();
+        write_text("ERROR erase\r\n> ");
+        return;
+    }
+
+    write_text("READY\r\n");
+
+    if (receive_image(slot, size) == 0U) {
+        mach32_flash_lock();
+        write_text("ERROR receive or program\r\n> ");
+        return;
+    }
+
+    mach32_flash_lock();
+
+    if (mach32_crc32((const uint8_t *)slot->start, size) != expected_crc) {
+        invalidate_slot(slot);
+        write_text("ERROR CRC32\r\n> ");
+        return;
+    }
+
+    if (application_is_valid(slot->start, slot->end) == 0U) {
+        invalidate_slot(slot);
+        write_text("ERROR vector table\r\n> ");
+        return;
+    }
+
+    write_text("OK\r\n> ");
+}
+
 __attribute__((noreturn))
 static void boot_application(uint32_t start)
 {
@@ -144,6 +372,10 @@ static void try_boot(char slot)
 
 static void process_command(char *command)
 {
+    const mach32_slot_t *slot;
+    uint32_t size;
+    uint32_t crc;
+
     if (text_equals(command, "status") != 0U) {
         show_status();
         write_text("> ");
@@ -151,14 +383,16 @@ static void process_command(char *command)
         try_boot('A');
     } else if (text_equals(command, "boot B") != 0U) {
         try_boot('B');
+    } else if (parse_upload_command(command, &slot, &size, &crc) != 0U) {
+        upload_image(slot, size, crc);
     } else {
-        write_text("Commands: status, boot A, boot B\r\n> ");
+        write_text("Commands: status, boot A, boot B, upload A/B\r\n> ");
     }
 }
 
 int main(void)
 {
-    char command[16] = {0};
+    char command[40] = {0};
     size_t command_length = 0U;
     uint32_t wait_start;
     uint8_t timeout_enabled = 1U;

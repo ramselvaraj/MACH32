@@ -25,9 +25,14 @@ make flash-demo
 screen /dev/ttyACM0 115200
 ```
 
-The bootloader accepts `status`, `boot A`, and `boot B`.
+The bootloader accepts `status`, `boot A`, and `boot B`. It can also erase and
+upload either application slot through USART2:
 
-It starts application A after a ten-second inactivity timeout. Application A blinks LD2
-slowly. Application B blinks LD2 quickly.
+```bash
+python3 tools/uart_upload.py /dev/ttyACM0 build/app_b/firmware.bin B
+```
+
+It starts application A after a ten-second inactivity timeout. Application A
+blinks LD2 slowly. Application B blinks LD2 quickly.
 
 See `Bootloader/README.md` for the Flash layout and test instructions.

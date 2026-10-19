@@ -2,7 +2,7 @@
  * MACH32 — linker script for the STM32F446RE
  *
  * STM32F446RE memory map (RM0390 §2):
- *   - Flash: 512 KB @ 0x08000000
+ *   - Flash: selected by MACH32_FLASH_ORIGIN and MACH32_FLASH_LENGTH
  *   - SRAM : 128 KB @ 0x20000000
  *
  * The startup code (startup_stm32f446xx.s) depends on these exported symbols:
@@ -11,11 +11,16 @@
 
 ENTRY(Reset_Handler)
 
+__flash_origin = DEFINED(MACH32_FLASH_ORIGIN)
+               ? MACH32_FLASH_ORIGIN : 0x08000000;
+__flash_length = DEFINED(MACH32_FLASH_LENGTH)
+               ? MACH32_FLASH_LENGTH : 512K;
+
 _estack = ORIGIN(RAM) + LENGTH(RAM);   /* top of stack: SRAM grows downward from here */
 
 MEMORY
 {
-    FLASH (rx)  : ORIGIN = 0x08000000, LENGTH = 512K
+    FLASH (rx)  : ORIGIN = __flash_origin, LENGTH = __flash_length
     RAM   (xrw) : ORIGIN = 0x20000000, LENGTH = 128K
 }
 

@@ -25,24 +25,28 @@ PROGRAM_DIR    = Bootloader
 FLASH_ORIGIN   = 0x08000000
 FLASH_LENGTH   = 0x00010000
 PROGRAM_DEFS   =
+STLINK_CONNECT = --hot-plug
 else ifeq ($(PROGRAM),app_a)
 PROGRAM_NAME   = app_a
 PROGRAM_DIR    = Applications/slot_a
 FLASH_ORIGIN   = 0x08010000
 FLASH_LENGTH   = 0x00030000
 PROGRAM_DEFS   = -DUSER_VECT_TAB_ADDRESS -DVECT_TAB_OFFSET=0x00010000
+STLINK_CONNECT = --hot-plug
 else ifeq ($(PROGRAM),app_b)
 PROGRAM_NAME   = app_b
 PROGRAM_DIR    = Applications/slot_b
 FLASH_ORIGIN   = 0x08040000
 FLASH_LENGTH   = 0x00030000
 PROGRAM_DEFS   = -DUSER_VECT_TAB_ADDRESS -DVECT_TAB_OFFSET=0x00040000
+STLINK_CONNECT = --hot-plug
 else
 PROGRAM_NAME   = $(EXAMPLE)
 PROGRAM_DIR    = Examples/$(EXAMPLE)
 FLASH_ORIGIN   = 0x08000000
 FLASH_LENGTH   = 0x00080000
 PROGRAM_DEFS   =
+STLINK_CONNECT = --connect-under-reset
 endif
 
 # ---- Paths ----
@@ -104,7 +108,7 @@ $(TARGET).elf: $(OBJ)
 	$(OBJCOPY) -O binary  $(TARGET).elf $(TARGET).bin
 
 flash: $(TARGET).elf
-	st-flash --connect-under-reset --reset write $(TARGET).bin $(FLASH_ORIGIN)
+	st-flash $(STLINK_CONNECT) --reset write $(TARGET).bin $(FLASH_ORIGIN)
 
 examples:
 	@for example in $(EXAMPLES); do \

@@ -101,6 +101,16 @@ LoopFillZerobss:
   bx  lr    
 .size  Reset_Handler, .-Reset_Handler
 
+/* Newlib calls _init from __libc_init_array. Bare-metal MACH32 does not need
+ * extra runtime initialization, so provide the required no-operation hook. */
+    .section .text._init,"ax",%progbits
+    .global _init
+    .type _init, %function
+    .thumb_func
+_init:
+    bx lr
+    .size _init, .-_init
+
 /**
  * @brief  This is the code that gets called when the processor receives an 
  *         unexpected interrupt.  This simply enters an infinite loop, preserving

@@ -16,6 +16,7 @@ SIZE    = $(PREFIX)size
 
 # ---- Which example to build ----
 EXAMPLE ?= 01_led_blink
+EXAMPLES = $(notdir $(patsubst %/,%,$(wildcard Examples/*/)))
 
 # ---- Paths ----
 CMSIS   = Drivers/cmsis
@@ -50,11 +51,12 @@ CFLAGS  = $(MCUFLAGS) $(DEFS) -Wall -Wextra -g3 -O0 \
           -I$(CMSIS) -I$(INC) -I$(BOARD)
 ASFLAGS = $(MCUFLAGS)
 LDFLAGS = $(MCUFLAGS) -T$(LINKER)/stm32f446re.ld \
+          -nostartfiles \
           --specs=nano.specs --specs=nosys.specs \
           -Wl,-Map=$(TARGET).map,--cref
 
 # ---- Rules ----
-.PHONY: all clean flash
+.PHONY: all clean flash examples
 
 all: $(TARGET).elf
 	$(SIZE) $(TARGET).elf
@@ -73,8 +75,13 @@ $(TARGET).elf: $(OBJ)
 	$(OBJCOPY) -O ihex    $(TARGET).elf $(TARGET).hex
 	$(OBJCOPY) -O binary  $(TARGET).elf $(TARGET).bin
 
-flash: $(TARGET).bin
-	st-flash write $(TARGET).bin 0x08000000
+flash: $(TARGET).elf
+	st-flash --connect-under-reset --reset write $(TARGET).bin 0x08000000
+
+examples:
+	@for example in $(EXAMPLES); do \
+		$(MAKE) --no-print-directory EXAMPLE=$$example || exit $$?; \
+	done
 
 clean:
 	rm -rf build

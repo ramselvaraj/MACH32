@@ -1,4 +1,4 @@
-/* MACH32 USART driver. */
+/* MACH32 blocking USART driver. */
 
 #ifndef MACH32_USART_H
 #define MACH32_USART_H
@@ -38,7 +38,5 @@ void mach32_usart_init(const mach32_usart_init_t *init);
 void mach32_usart_write_byte(USART_TypeDef *usart, uint8_t data);
 uint8_t mach32_usart_read_byte(USART_TypeDef *usart);
 void mach32_usart_write(USART_TypeDef *usart, const uint8_t *data, size_t length);
-void mach32_usart_enable_rx_interrupt(USART_TypeDef *usart);
-void mach32_usart_disable_rx_interrupt(USART_TypeDef *usart);
 
 #endif /* MACH32_USART_H */

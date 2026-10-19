@@ -2,4 +2,15 @@
 
 ![MACH32](assets/mach32.jpeg)
 
-A collection of baremetal drivers for the STM32.
+A learning-focused bare-metal driver pack for the STM32F446RE.
+
+Included drivers:
+
+- RCC, GPIO, SysTick, NVIC, and EXTI.
+- Polling USART, SPI, and I2C.
+- Timers, PWM, ADC, and DMA.
+- Internal Flash, CRC32, and the independent watchdog.
+- Polling bxCAN.
+
+The code uses ST and Arm CMSIS register definitions. Hardware-dependent behavior
+is not verified yet.

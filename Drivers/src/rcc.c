@@ -76,33 +76,16 @@ void mach32_rcc_system_clock_config(void)
 
     while ((RCC->CR & RCC_CR_HSERDY) == 0U) {
         /* Wait until the external clock is stable. */
+        __NOP();
     }
 
     /* PWR must be clocked before its voltage-scaling and over-drive
      * registers can be configured for 180 MHz operation. */
     RCC->APB1ENR |= RCC_APB1ENR_PWREN;
 
-    /* Select voltage scale 1 and wait for the regulator. */
+    /* Select voltage scale 1. VOSRDY becomes valid after the PLL starts. */
     PWR->CR &= ~PWR_CR_VOS;
     PWR->CR |= PWR_CR_VOS;
-
-    while ((PWR->CSR & PWR_CSR_VOSRDY) == 0U) {
-        /* Wait until the voltage scale is ready. */
-    }
-
-    /* Start the over-drive circuit and wait until it is ready. */
-    PWR->CR |= PWR_CR_ODEN;
-
-    while ((PWR->CSR & PWR_CSR_ODRDY) == 0U) {
-        /* Wait until the over-drive circuit is ready. */
-    }
-
-    /* Connect the over-drive circuit to the processor core. */
-    PWR->CR |= PWR_CR_ODSWEN;
-
-    while ((PWR->CSR & PWR_CSR_ODSWRDY) == 0U) {
-        /* Wait until the over-drive switch is ready. */
-    }
 
     /* Configure Flash before increasing SYSCLK. */
     FLASH->ACR = FLASH_ACR_LATENCY_5WS
@@ -140,6 +123,28 @@ void mach32_rcc_system_clock_config(void)
 
     while ((RCC->CR & RCC_CR_PLLRDY) == 0U) {
         /* Wait until the PLL locks to the configured frequency. */
+        __NOP();
+    }
+
+    while ((PWR->CSR & PWR_CSR_VOSRDY) == 0U) {
+        /* Wait until voltage scale 1 is active. */
+        __NOP();
+    }
+
+    /* Start the over-drive circuit after the PLL is ready. */
+    PWR->CR |= PWR_CR_ODEN;
+
+    while ((PWR->CSR & PWR_CSR_ODRDY) == 0U) {
+        /* Wait until the over-drive circuit is ready. */
+        __NOP();
+    }
+
+    /* Connect the over-drive circuit to the processor core. */
+    PWR->CR |= PWR_CR_ODSWEN;
+
+    while ((PWR->CSR & PWR_CSR_ODSWRDY) == 0U) {
+        /* Wait until the over-drive switch is ready. */
+        __NOP();
     }
 
     /* Select the PLL as SYSCLK and wait for hardware confirmation. */
@@ -148,6 +153,7 @@ void mach32_rcc_system_clock_config(void)
 
     while ((RCC->CFGR & RCC_CFGR_SWS) != RCC_CFGR_SWS_PLL) {
         /* Wait until the PLL supplies SYSCLK. */
+        __NOP();
     }
 
     SystemCoreClock = 180000000U;

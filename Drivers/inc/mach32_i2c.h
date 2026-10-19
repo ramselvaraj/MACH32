@@ -16,6 +16,7 @@ typedef struct {
 } mach32_i2c_init_t;
 
 void mach32_i2c_init(const mach32_i2c_init_t *init);
+uint8_t mach32_i2c_probe(I2C_TypeDef *i2c, uint8_t address);
 uint8_t mach32_i2c_master_transmit(I2C_TypeDef *i2c, uint8_t address,
                                    const uint8_t *data, size_t length);
 uint8_t mach32_i2c_master_receive(I2C_TypeDef *i2c, uint8_t address,

@@ -24,5 +24,9 @@
 #include "mach32_i2c.h"
 #include "mach32_adc.h"
 #include "mach32_dma.h"
+#include "mach32_flash.h"
+#include "mach32_crc32.h"
+#include "mach32_iwdg.h"
+#include "mach32_can.h"
 
 #endif /* MACH32_H */

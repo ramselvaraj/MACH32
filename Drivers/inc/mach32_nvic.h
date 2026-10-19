@@ -1,4 +1,4 @@
-/* MACH32 Nested Vectored Interrupt Controller driver. */
+/* MACH32 external-interrupt controller driver. */
 
 #ifndef MACH32_NVIC_H
 #define MACH32_NVIC_H

@@ -38,4 +38,4 @@ Application A changes LD2 every second.
 
 Application B changes LD2 every 200 ms.
 
-The bootloader starts application A after three seconds without a command.
+The bootloader starts application A after ten seconds without UART activity.

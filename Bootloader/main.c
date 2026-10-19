@@ -7,7 +7,7 @@
 #define MACH32_SLOT_B_END   0x08070000UL
 #define MACH32_RAM_START    0x20000000UL
 #define MACH32_RAM_END      0x20020000UL
-#define MACH32_BOOT_WAIT_MS 3000UL
+#define MACH32_BOOT_WAIT_MS 10000UL
 
 static void write_text(const char *text)
 {
@@ -169,12 +169,15 @@ int main(void)
 
     write_text("\r\nMACH32 bootloader\r\n");
     show_status();
-    write_text("Type a command within three seconds.\r\n> ");
+    write_text("Type a command within ten seconds.\r\n> ");
     wait_start = mach32_systick_millis();
 
     while (1) {
         if ((USART2->SR & USART_SR_RXNE) != 0U) {
             char byte = (char)(USART2->DR & 0xFFU);
+
+            /* Give the learner a full timeout period after each key press. */
+            wait_start = mach32_systick_millis();
 
             if ((byte == '\r') || (byte == '\n')) {
                 if (command_length != 0U) {
